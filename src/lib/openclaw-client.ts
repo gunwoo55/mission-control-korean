@@ -1,7 +1,5 @@
-// OpenClaw Gateway HTTP Client
-// Connects to OpenClaw gateway via HTTP API
-
-const API_BASE = "/api"; // Proxy through Next.js
+// OpenClaw Gateway HTTP Client - Real Implementation
+// Based on actual OpenClaw API structure
 
 export interface GatewayConfig {
   url: string;
@@ -24,36 +22,9 @@ export interface SessionInfo {
   costUSD?: number;
 }
 
-export interface SessionStatus {
-  sessionKey: string;
-  model: string;
-  agentId?: string;
-  runtime: {
-    host: string;
-    shell: string;
-    channel?: string;
-  };
-  usage: {
-    tokens: {
-      total: number;
-      prompt: number;
-      completion: number;
-    };
-    costUSD: number;
-  };
-  time: {
-    elapsedMs: number;
-    thinkingMs?: number;
-  };
-}
-
-export interface CronJob {
-  id: string;
-  name: string;
-  schedule: string;
-  enabled: boolean;
-  lastRun?: string;
-  nextRun?: string;
+// Debug logger
+function log(type: "info" | "error" | "warn", message: string, data?: any) {
+  console.log(`[OpenClaw:${type.toUpperCase()}] ${message}`, data || "");
 }
 
 class OpenClawClient {
@@ -62,13 +33,12 @@ class OpenClawClient {
 
   setConfig(config: GatewayConfig) {
     this.config = config;
-    // Remove trailing slash and ensure https
     this.baseUrl = config.url.replace(/\/$/, "");
     if (this.baseUrl.startsWith("ws")) {
       this.baseUrl = this.baseUrl.replace(/^ws/, "http");
     }
-    // Save to localStorage for other tabs
     localStorage.setItem("openclaw_config", JSON.stringify(config));
+    log("info", "Config set", { url: this.baseUrl });
   }
 
   loadConfig(): GatewayConfig | null {
@@ -82,91 +52,150 @@ class OpenClawClient {
   }
 
   private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
-    if (!this.config) throw new Error("Not configured");
+    if (!this.config) {
+      throw new Error("OpenClaw not configured. Connect in Live tab first.");
+    }
 
     const url = `${this.baseUrl}${endpoint}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "X-Gateway-Token": this.config.token,
+      "Accept": "application/json",
       ...((options.headers as Record<string, string>) || {}),
     };
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || `HTTP ${response.status}`);
+    // Add auth header if we have a token
+    if (this.config.token) {
+      headers["Authorization"] = `Bearer ${this.config.token}`;
     }
 
-    return response.json();
+    log("info", `Request: ${options.method || "GET"} ${endpoint}`);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        mode: "cors",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        log("error", `HTTP ${response.status}: ${errorText}`);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      log("info", `Response: ${endpoint}`, data);
+      return data;
+    } catch (err: any) {
+      log("error", `Request failed: ${endpoint}`, err.message);
+      throw err;
+    }
   }
 
-  // Test connection
+  // Test connection to gateway
   async testConnection(): Promise<{ version: string; status: string }> {
     return this.request("/status");
   }
 
-  // Get all sessions
-  async getSessions(options?: { 
-    activeMinutes?: number; 
-    kinds?: string[];
+  // Get all sessions from OpenClaw
+  async getSessions(options?: {
+    activeMinutes?: number;
     limit?: number;
   }): Promise<SessionInfo[]> {
-    const params = new URLSearchParams();
-    if (options?.activeMinutes) params.set("activeMinutes", String(options.activeMinutes));
-    if (options?.limit) params.set("limit", String(options.limit));
-    
-    const query = params.toString() ? `?${params.toString()}` : "";
-    const result = await this.request(`/sessions${query}`);
-    return result.sessions || [];
+    try {
+      // Try the actual OpenClaw API endpoint
+      const params = new URLSearchParams();
+      if (options?.activeMinutes) params.set("activeMinutes", String(options.activeMinutes));
+      if (options?.limit) params.set("limit", String(options.limit));
+
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const result = await this.request(`/api/sessions${query}`);
+
+      // Map OpenClaw response format
+      const sessions = result.sessions || result || [];
+
+      return sessions.map((s: any) => ({
+        sessionKey: s.sessionKey || s.id,
+        agentId: s.agentId,
+        label: s.label,
+        model: s.model || "unknown",
+        createdAt: s.createdAt,
+        lastActivityAt: s.lastActivityAt || s.updatedAt,
+        active: s.active || false,
+        tokenUsage: s.tokenUsage || { total: 0, prompt: 0, completion: 0 },
+        costUSD: s.costUSD || s.cost || 0,
+      }));
+    } catch (err) {
+      log("error", "Failed to get sessions", err);
+      return [];
+    }
   }
 
-  // Get specific session status (includes token usage)
-  async getSessionStatus(sessionKey?: string): Promise<SessionStatus> {
+  // Get session status with detailed info
+  async getSessionStatus(sessionKey?: string): Promise<any> {
     const key = sessionKey || "current";
-    return this.request(`/sessions/${key}/status`);
+    return this.request(`/api/sessions/${key}/status`);
   }
 
-  // Send message to session
-  async sendMessage(sessionKey: string, message: string): Promise<void> {
-    await this.request(`/sessions/${sessionKey}/send`, {
+  // Send message to a session
+  async sendMessage(sessionKey: string, message: string): Promise<any> {
+    log("info", `Sending message to ${sessionKey}`, { message: message.slice(0, 50) });
+
+    return this.request(`/api/sessions/${sessionKey}/send`, {
       method: "POST",
       body: JSON.stringify({ message }),
     });
   }
 
-  // Spawn sub-agent
+  // Alternative: Use the spawn/send approach
+  async sendToSession(sessionKey: string, message: string): Promise<any> {
+    // Try different API patterns
+    const endpoints = [
+      `/api/sessions/${sessionKey}/send`,
+      `/api/sessions/send`,
+      `/sessions/${sessionKey}/send`,
+    ];
+
+    let lastError: any;
+
+    for (const endpoint of endpoints) {
+      try {
+        log("info", `Trying endpoint: ${endpoint}`);
+        const result = await this.request(endpoint, {
+          method: "POST",
+          body: JSON.stringify({ sessionKey, message }),
+        });
+        return result;
+      } catch (err) {
+        lastError = err;
+        continue;
+      }
+    }
+
+    throw lastError || new Error("All endpoints failed");
+  }
+
+  // Spawn a sub-agent
   async spawnAgent(task: string, agentId?: string): Promise<{ sessionKey: string }> {
-    return this.request("/spawn", {
+    return this.request("/api/spawn", {
       method: "POST",
-      body: JSON.stringify({
-        task,
-        agentId,
-        cleanup: "keep",
-      }),
+      body: JSON.stringify({ task, agentId, cleanup: "keep" }),
     });
   }
 
   // Get cron jobs
-  async getCronJobs(): Promise<CronJob[]> {
-    const result = await this.request("/cron");
-    return result.jobs || [];
+  async getCronJobs(): Promise<any[]> {
+    try {
+      const result = await this.request("/api/cron");
+      return result.jobs || [];
+    } catch {
+      return [];
+    }
   }
 
-  // Run cron job immediately
+  // Run cron job
   async runCronJob(jobId: string): Promise<void> {
-    await this.request(`/cron/${jobId}/run`, {
-      method: "POST",
-    });
-  }
-
-  // Get sub-agents for a session
-  async getSubAgents(sessionKey: string): Promise<SessionInfo[]> {
-    const result = await this.request(`/sessions/${sessionKey}/subagents`);
-    return result.subagents || [];
+    await this.request(`/api/cron/${jobId}/run`, { method: "POST" });
   }
 
   isConfigured(): boolean {
@@ -176,7 +205,7 @@ class OpenClawClient {
 
 export const openClawClient = new OpenClawClient();
 
-// React hook
+// React hook with better error handling
 import { useState, useEffect, useCallback } from "react";
 
 export function useOpenClaw() {
@@ -184,30 +213,24 @@ export function useOpenClaw() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [currentStatus, setCurrentStatus] = useState<SessionStatus | null>(null);
+  const [rawResponse, setRawResponse] = useState<any>(null);
 
   const connect = useCallback(async (url: string, token: string) => {
     setConnecting(true);
     setError(null);
-    
+
     try {
       openClawClient.setConfig({ url, token });
       const status = await openClawClient.testConnection();
-      console.log("[OpenClaw] Connected:", status);
+      log("info", "Connected to gateway", status);
       setConnected(true);
-      
-      // Load initial data
+
+      // Load sessions immediately
       const sessionsData = await openClawClient.getSessions({ limit: 50 });
       setSessions(sessionsData);
-      
-      try {
-        const current = await openClawClient.getSessionStatus();
-        setCurrentStatus(current);
-      } catch (e) {
-        // current session might not exist
-      }
+      setRawResponse(sessionsData);
     } catch (err: any) {
-      console.error("[OpenClaw] Connection failed:", err);
+      log("error", "Connection failed", err);
       setError(err.message || "Connection failed");
       setConnected(false);
     } finally {
@@ -218,7 +241,7 @@ export function useOpenClaw() {
   const disconnect = useCallback(() => {
     setConnected(false);
     setSessions([]);
-    setCurrentStatus(null);
+    localStorage.removeItem("openclaw_config");
   }, []);
 
   const refreshSessions = useCallback(async () => {
@@ -226,25 +249,20 @@ export function useOpenClaw() {
     try {
       const data = await openClawClient.getSessions({ limit: 50 });
       setSessions(data);
-    } catch (e) {
-      console.error("Failed to refresh sessions:", e);
+    } catch (e: any) {
+      console.error("Failed to refresh:", e);
     }
   }, [connected]);
 
   const sendMessage = useCallback(async (sessionKey: string, message: string) => {
     if (!connected) throw new Error("Not connected");
-    await openClawClient.sendMessage(sessionKey, message);
+    log("info", `Sending message via hook: ${sessionKey}`);
+    return openClawClient.sendToSession(sessionKey, message);
   }, [connected]);
 
-  const spawnAgent = useCallback(async (task: string, agentId?: string) => {
-    if (!connected) throw new Error("Not connected");
-    return openClawClient.spawnAgent(task, agentId);
-  }, [connected]);
-
-  // Auto-refresh sessions every 5 seconds when connected
+  // Auto-refresh
   useEffect(() => {
     if (!connected) return;
-    
     const interval = setInterval(refreshSessions, 5000);
     return () => clearInterval(interval);
   }, [connected, refreshSessions]);
@@ -254,11 +272,10 @@ export function useOpenClaw() {
     connecting,
     error,
     sessions,
-    currentStatus,
+    rawResponse,
     connect,
     disconnect,
     refreshSessions,
     sendMessage,
-    spawnAgent,
   };
 }

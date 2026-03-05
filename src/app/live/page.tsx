@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Bot, Zap, Send, Loader2 } from "lucide-react";
+import { Activity, Bot, Zap, Send, Loader2, Terminal, Bug } from "lucide-react";
 import { useOpenClaw, SessionInfo } from "@/lib/openclaw-client";
 import { ConnectionPanel } from "@/components/connection-panel";
 
@@ -17,6 +17,7 @@ export default function LiveDashboard() {
     connecting,
     error,
     sessions,
+    rawResponse,
     connect,
     disconnect,
     sendMessage,
@@ -26,6 +27,7 @@ export default function LiveDashboard() {
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [command, setCommand] = useState("");
   const [sending, setSending] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
   const addLog = (text: string, type: "info" | "error" | "sent" = "info") => {
     setLogs((prev) => [...prev.slice(-99), { time: new Date().toLocaleTimeString(), text, type }]);
@@ -45,13 +47,13 @@ export default function LiveDashboard() {
 
   const handleSendCommand = async () => {
     if (!selectedSession || !command.trim() || sending) return;
-    
+
     setSending(true);
     addLog(`[${selectedSession.agentId || selectedSession.sessionKey.slice(0, 8)}] ${command}`, "sent");
-    
+
     try {
-      await sendMessage(selectedSession.sessionKey, command);
-      addLog("Message sent successfully", "info");
+      const result = await sendMessage(selectedSession.sessionKey, command);
+      addLog(`Response: ${JSON.stringify(result).slice(0, 100)}`, "info");
     } catch (err: any) {
       addLog(`Failed: ${err.message}`, "error");
     } finally {
@@ -72,6 +74,13 @@ export default function LiveDashboard() {
           <p className="text-gray-400">OpenClaw 게이트웨이 실시간 모니터링</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowDebug(!showDebug)}
+            className="p-2 text-gray-400 hover:text-white"
+            title="Debug"
+          >
+            <Bug className="w-5 h-5" />
+          </button>
           <div className={`w-3 h-3 rounded-full ${
             connected ? "bg-green-500 animate-pulse" : connecting ? "bg-amber-500" : "bg-red-500"
           }`}></div>
@@ -93,6 +102,18 @@ export default function LiveDashboard() {
         <ConnectionPanel onConnect={connect} connecting={connecting} />
       ) : (
         <>
+          {showDebug && rawResponse && (
+            <div className="bg-gray-950 border border-gray-800 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-400">Debug: Raw API Response</h3>
+                <button onClick={() => setShowDebug(false)} className="text-xs text-gray-500">닫기</button>
+              </div>
+              <pre className="text-xs text-green-400 overflow-auto max-h-48">
+                {JSON.stringify(rawResponse, null, 2)}
+              </pre>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={Bot} label="총 세션" value={sessions.length} color="blue" />
             <StatCard icon={Zap} label="활성 세션" value={activeSessions} color="green" />
@@ -111,10 +132,13 @@ export default function LiveDashboard() {
                 <h2 className="text-lg font-semibold text-white">세션 목록</h2>
                 <span className="text-xs text-gray-500">5초마다 갱신</span>
               </div>
-              
+
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {sessions.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">활성 세션이 없습니다</p>
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 mb-2">세션이 없습니다</p>
+                    <p className="text-xs text-gray-600">OpenClaw에서 세션이 생성되면 여기에 표시됩니다.</p>
+                  </div>
                 ) : (
                   sessions.map((session) => (
                     <button
@@ -162,10 +186,14 @@ export default function LiveDashboard() {
                   </span>
                 )}
               </div>
-              
+
               <div className="bg-gray-950 rounded-lg p-4 h-64 overflow-y-auto font-mono text-xs">
                 {logs.length === 0 ? (
-                  <p className="text-gray-600">로그가 없습니다... 세션을 선택하고 명령을 별내세요.</p>
+                  <p className="text-gray-600">
+                    로그가 없습니다... 세션을 선택하고 명령을 전송하세요.
+                    <br />
+                    <span className="text-gray-700">(채팅 탭에서도 메시지를 별낼 수 있습니다)</span>
+                  </p>
                 ) : (
                   logs.map((log, i) => (
                     <div

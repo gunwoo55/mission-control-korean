@@ -46,16 +46,16 @@ export default function ConversationsPage() {
 
       const { url, token } = JSON.parse(config);
       openClawClient.setConfig({ url, token });
-      
+
       const data = await openClawClient.getSessions({ limit: 50 });
       setSessions(data);
-      
+
       // Keep selected session updated
       if (selectedSession) {
         const updated = data.find((s) => s.sessionKey === selectedSession.sessionKey);
         if (updated) setSelectedSession(updated);
       }
-      
+
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -92,13 +92,14 @@ export default function ConversationsPage() {
     setSending(true);
 
     try {
-      await openClawClient.sendMessage(selectedSession.sessionKey, userMsg.content);
-      
-      // Add acknowledgment
+      // Use the client method that tries multiple endpoints
+      const result = await openClawClient.sendToSession(selectedSession.sessionKey, userMsg.content);
+
+      // Add acknowledgment with response
       const ackMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "메시지를 전송했습니다. 에이전트가 처리 중입니다...",
+        content: `메시지 전송됨. 응답: ${JSON.stringify(result).slice(0, 200)}`,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, ackMsg]);
@@ -106,7 +107,7 @@ export default function ConversationsPage() {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `오류: ${err.message}`,
+        content: `❌ 오류: ${err.message}\n\n브라우저 콘솔(F12)에서 자세한 내용을 확인하세요.`,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
