@@ -17,11 +17,13 @@ import {
   DollarSign,
   X,
   Menu,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "대시보드", href: "/", icon: LayoutDashboard },
+  { name: "실시간", href: "/live", icon: Radio },
   { name: "에이전트", href: "/agents", icon: Bot },
   { name: "작업 관리", href: "/tasks", icon: Kanban },
   { name: "예약 작업", href: "/cron", icon: Clock },
