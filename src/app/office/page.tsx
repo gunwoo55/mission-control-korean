@@ -47,7 +47,6 @@ export default function OfficePage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas size
     canvas.width = OFFICE_WIDTH;
     canvas.height = OFFICE_HEIGHT;
 
@@ -61,7 +60,7 @@ export default function OfficePage() {
       ctx.fillStyle = "#111827";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw office grid
+      // Draw grid
       ctx.strokeStyle = "#1F2937";
       ctx.lineWidth = 1;
       for (let x = 0; x < canvas.width; x += 40) {
@@ -87,12 +86,10 @@ export default function OfficePage() {
       // Draw coffee machine
       drawCoffeeMachine(ctx, 650, 100);
 
-      // Update and draw agents
-      setAgents((prevAgents) =>
+      // Update agents
+      setAgents((prevAgents) =
         prevAgents.map((agent) => {
           const newAgent = { ...agent };
-
-          // Move towards target
           const dx = newAgent.targetX - newAgent.x;
           const dy = newAgent.targetY - newAgent.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
@@ -105,7 +102,6 @@ export default function OfficePage() {
             newAgent.status = Math.random() > 0.3 ? "working" : "idle";
           }
 
-          // Random movement
           if (Math.random() < 0.005 && newAgent.status !== "moving") {
             newAgent.targetX = 50 + Math.random() * 700;
             newAgent.targetY = 50 + Math.random() * 500;
@@ -120,8 +116,8 @@ export default function OfficePage() {
         drawAgent(ctx, agent);
       });
 
-      // Update and draw particles
-      setParticles((prevParticles) =>
+      // Update particles
+      setParticles((prevParticles) =
         prevParticles
           .map((p) => {
             const dx = p.targetX - p.x;
@@ -135,16 +131,16 @@ export default function OfficePage() {
                 y: p.y + (dy / distance) * 3,
               };
             }
-            return null;
+            return null as any;
           })
-          .filter(Boolean) as TaskParticle[]
+          .filter(Boolean)
       );
 
       particles.forEach((p) => {
         if (p) drawParticle(ctx, p);
       });
 
-      // Spawn new particles randomly
+      // Spawn particles
       if (Math.random() < 0.02) {
         const fromAgent = agents[Math.floor(Math.random() * agents.length)];
         const toAgent = agents[Math.floor(Math.random() * agents.length)];
@@ -282,9 +278,9 @@ export default function OfficePage() {
     if (clickedAgent) {
       setSelectedAgent(clickedAgent);
     } else {
-      // Move all agents to clicked position (for fun)
-      setAgents((prev) =
-        prev.map((agent, i) => ({
+      // Move all agents to clicked position
+      setAgents((currentAgents) =
+        currentAgents.map((agent, i) => ({
           ...agent,
           targetX: x + (i - 1) * 50,
           targetY: y + (i - 1) * 30,
@@ -411,7 +407,7 @@ export default function OfficePage() {
           { color: "#EC4899", label: "신규", task: "대기" },
         ].map((item) => (
           <div key={item.label} className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg p-3">
-            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }}></div>
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: item.color }} />
             <div className="text-sm">
               <div className="text-white">{item.label}</div>
               <div className="text-gray-500 text-xs">{item.task}</div>
