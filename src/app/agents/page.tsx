@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Bot, Circle, MoreHorizontal, Plus, X, Check } from "lucide-react";
-import { getAgents, Agent, getTasks } from "@/lib/data";
+import { getAgents, saveAgents, Agent } from "@/lib/data";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -19,10 +19,30 @@ export default function AgentsPage() {
 
   const handleAddAgent = () => {
     if (!newAgent.name.trim()) return;
-    // In real implementation, this would call an API
-    alert("에이전트 추가 기능은 OpenClaw 연동 후 사용 가능합니다.");
+    
+    const agent: Agent = {
+      id: Date.now().toString(),
+      name: newAgent.name,
+      description: newAgent.description,
+      skills: newAgent.skills.split(",").map((s) => s.trim()).filter(Boolean),
+      status: "idle",
+      lastActive: "방금",
+      tokenUsage: 0,
+    };
+    
+    const updated = [...agents, agent];
+    saveAgents(updated);
+    setAgents(updated);
     setIsModalOpen(false);
     setNewAgent({ name: "", description: "", skills: "" });
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("정말 삭제하시겠습니까?")) {
+      const updated = agents.filter((a) => a.id !== id);
+      saveAgents(updated);
+      setAgents(updated);
+    }
   };
 
   return (
@@ -41,26 +61,40 @@ export default function AgentsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {agents.map((agent) => (
-          <AgentCard key={agent.id} agent={agent} />
-        ))}
+      {agents.length === 0 ? (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+          <div className="text-4xl mb-4">🤖</div>
+          <h3 className="text-lg font-semibold text-white mb-2">등록된 에이전트가 없습니다</h3>
+          <p className="text-gray-400 mb-4">새로운 AI 에이전트를 추가핳세요.</p>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+          >
+            첫 에이전트 추가
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {agents.map((agent) => (
+            <AgentCard key={agent.id} agent={agent} onDelete={handleDelete} />
+          ))}
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-gray-900/50 border border-dashed border-gray-700 rounded-xl p-5 flex flex-col items-center justify-center gap-3 hover:border-gray-500 hover:bg-gray-900 transition-all min-h-[200px]"
-        >
-          <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center">
-            <Plus className="w-6 h-6 text-gray-400" />
-          </div>
-          <div className="text-center">
-            <p className="text-white font-medium">새 에이전트 추가</p>
-            <p className="text-sm text-gray-400">서브에이전트 생성하기</p>
-          </div>
-        </button>
-      </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-gray-900/50 border border-dashed border-gray-700 rounded-xl p-5 flex flex-col items-center justify-center gap-3 hover:border-gray-500 hover:bg-gray-900 transition-all min-h-[200px]"
+          >
+            <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center">
+              <Plus className="w-6 h-6 text-gray-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-white font-medium">새 에이전트 추가</p>
+              <p className="text-sm text-gray-400">서브에이전트 생성하기</p>
+            </div>
+          </button>
+        </div>
+      )}
 
-      {/* New Agent Modal */}
+      {/* Add Agent Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md">
@@ -79,7 +113,7 @@ export default function AgentsPage() {
                   value={newAgent.name}
                   onChange={(e) => setNewAgent({ ...newAgent, name: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
-                  placeholder="에이전트 이름"
+                  placeholder="예: 리서처"
                 />
               </div>
               
@@ -129,7 +163,7 @@ export default function AgentsPage() {
   );
 }
 
-function AgentCard({ agent }: { agent: Agent }) {
+function AgentCard({ agent, onDelete }: { agent: Agent; onDelete: (id: string) => void }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 lg:p-5 hover:border-gray-700 transition-colors">
       <div className="flex items-start justify-between mb-4">
@@ -139,11 +173,11 @@ function AgentCard({ agent }: { agent: Agent }) {
           </div>
           <div>
             <h3 className="font-semibold text-white text-sm lg:text-base">{agent.name}</h3>
-            <p className="text-xs text-gray-400">{agent.description}</p>
+            <p className="text-xs text-gray-400">{agent.description || "설명 없음"}</p>
           </div>
         </div>
-        <button className="text-gray-400 hover:text-white">
-          <MoreHorizontal className="w-5 h-5" />
+        <button onClick={() => onDelete(agent.id)} className="text-gray-400 hover:text-red-400">
+          <X className="w-5 h-5" />
         </button>
       </div>
 
@@ -167,11 +201,15 @@ function AgentCard({ agent }: { agent: Agent }) {
       <div className="mb-4">
         <p className="text-xs text-gray-500 mb-2">스킬</p>
         <div className="flex flex-wrap gap-2">
-          {agent.skills.map((skill) => (
-            <span key={skill} className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded-md">
-              {skill}
-            </span>
-          ))}
+          {agent.skills.length > 0 ? (
+            agent.skills.map((skill) => (
+              <span key={skill} className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded-md">
+                {skill}
+              </span>
+            ))
+          ) : (
+            <span className="text-xs text-gray-500">스킬 없음</span>
+          )}
         </div>
       </div>
 

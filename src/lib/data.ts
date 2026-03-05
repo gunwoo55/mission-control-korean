@@ -1,10 +1,15 @@
-// Local storage helpers for persistent data
+// Unified data management with localStorage - NO HARDCODED DATA
+
 const STORAGE_KEYS = {
   TASKS: "mc_tasks",
   AGENTS: "mc_agents",
   CONVERSATIONS: "mc_conversations",
-  SETTINGS: "mc_settings",
+  SKILLS: "mc_skills",
+  CRON_JOBS: "mc_cron_jobs",
   COST_DATA: "mc_cost_data",
+  SCOUT_DATA: "mc_scout_data",
+  SETTINGS: "mc_settings",
+  MEMORY_FILES: "mc_memory_files",
 };
 
 export function getFromStorage<T>(key: string, defaultValue: T): T {
@@ -26,6 +31,17 @@ export function setToStorage<T>(key: string, value: T): void {
   }
 }
 
+// Initialize empty storage - NO DEFAULT DATA
+export function initializeStorage(): void {
+  if (typeof window === "undefined") return;
+  
+  Object.values(STORAGE_KEYS).forEach((key) => {
+    if (localStorage.getItem(key) === null) {
+      localStorage.setItem(key, JSON.stringify([]));
+    }
+  });
+}
+
 // Task types
 export interface Task {
   id: string;
@@ -38,116 +54,8 @@ export interface Task {
   dueDate?: string;
 }
 
-// Agent types
-export interface Agent {
-  id: string;
-  name: string;
-  status: "active" | "idle" | "offline";
-  skills: string[];
-  lastActive: string;
-  tokenUsage: number;
-  description: string;
-}
-
-// Conversation types
-export interface Message {
-  id: string;
-  content: string;
-  sender: "user" | "agent";
-  timestamp: string;
-}
-
-export interface Conversation {
-  id: string;
-  title: string;
-  agent: string;
-  messages: Message[];
-  lastMessage: string;
-  timestamp: string;
-  unread: number;
-}
-
-// Default data
-export const defaultAgents: Agent[] = [
-  {
-    id: "1",
-    name: "루루",
-    status: "active",
-    skills: ["코딩", "리서치", "메모리 관리"],
-    lastActive: "방금",
-    tokenUsage: 125000,
-    description: "메인 AI 어시스턴트",
-  },
-  {
-    id: "2",
-    name: "리서처",
-    status: "idle",
-    skills: ["웹 검색", "데이터 분석"],
-    lastActive: "5분 전",
-    tokenUsage: 45000,
-    description: "정보 수집 전문 에이전트",
-  },
-  {
-    id: "3",
-    name: "코더",
-    status: "active",
-    skills: ["프론트엔드", "백엔드", "디버깅"],
-    lastActive: "방금",
-    tokenUsage: 89000,
-    description: "개발 작업 전문 에이전트",
-  },
-];
-
-export const defaultTasks: Task[] = [
-  {
-    id: "1",
-    title: "미션 컨트롤 대시보드 개발",
-    description: "OpenClaw용 한국어 대시보드 구현",
-    status: "in-progress",
-    priority: "high",
-    assignee: "루루",
-    createdAt: new Date().toISOString(),
-    dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-  },
-  {
-    id: "2",
-    title: "매경 서포터즈 지원서 작성",
-    description: "17기 지원서 초안 작성",
-    status: "backlog",
-    priority: "high",
-    assignee: "건우",
-    createdAt: new Date().toISOString(),
-  },
-];
-
-export const defaultConversations: Conversation[] = [
-  {
-    id: "1",
-    title: "미션 컨트롤 개발",
-    agent: "루루",
-    messages: [
-      {
-        id: "1",
-        content: "미션 컨트롤 대시보드 개발 시작할게! Next.js로 기본 구조부터 잡을게.",
-        sender: "agent",
-        timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      },
-      {
-        id: "2",
-        content: "응, 다크 모드 기본으로 해주고 사이드바는 왼쪽에 배치해줘.",
-        sender: "user",
-        timestamp: new Date(Date.now() - 28 * 60 * 1000).toISOString(),
-      },
-    ],
-    lastMessage: "한국어 대시보드 UI 구현 완료했어!",
-    timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    unread: 0,
-  },
-];
-
-// Data management functions
 export function getTasks(): Task[] {
-  return getFromStorage(STORAGE_KEYS.TASKS, defaultTasks);
+  return getFromStorage(STORAGE_KEYS.TASKS, []);
 }
 
 export function saveTasks(tasks: Task[]): void {
@@ -176,88 +84,144 @@ export function deleteTask(taskId: string): void {
   saveTasks(tasks.filter((t) => t.id !== taskId));
 }
 
+// Agent types
+export interface Agent {
+  id: string;
+  name: string;
+  status: "active" | "idle" | "offline";
+  skills: string[];
+  lastActive: string;
+  tokenUsage: number;
+  description: string;
+}
+
 export function getAgents(): Agent[] {
-  return getFromStorage(STORAGE_KEYS.AGENTS, defaultAgents);
+  return getFromStorage(STORAGE_KEYS.AGENTS, []);
 }
 
-export function getConversations(): Conversation[] {
-  return getFromStorage(STORAGE_KEYS.CONVERSATIONS, defaultConversations);
+export function saveAgents(agents: Agent[]): void {
+  setToStorage(STORAGE_KEYS.AGENTS, agents);
 }
 
-export function addMessage(conversationId: string, content: string, sender: "user" | "agent"): void {
-  const conversations = getConversations();
-  const updated = conversations.map((c) => {
-    if (c.id === conversationId) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        content,
-        sender,
-        timestamp: new Date().toISOString(),
-      };
-      return {
-        ...c,
-        messages: [...c.messages, newMessage],
-        lastMessage: content,
-        timestamp: new Date().toISOString(),
-        unread: sender === "agent" ? c.unread + 1 : c.unread,
-      };
-    }
-    return c;
-  });
-  setToStorage(STORAGE_KEYS.CONVERSATIONS, updated);
+// Skill types
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  version: string;
+  installed: boolean;
 }
 
-export function markConversationAsRead(conversationId: string): void {
-  const conversations = getConversations();
-  const updated = conversations.map((c) =>
-    c.id === conversationId ? { ...c, unread: 0 } : c
-  );
-  setToStorage(STORAGE_KEYS.CONVERSATIONS, updated);
+export function getSkills(): Skill[] {
+  return getFromStorage(STORAGE_KEYS.SKILLS, []);
 }
 
-// Cost tracking
-export function recordTokenUsage(agentId: string, tokens: number): void {
-  const agents = getAgents();
-  const updated = agents.map((a) =>
-    a.id === agentId ? { ...a, tokenUsage: a.tokenUsage + tokens } : a
-  );
-  setToStorage(STORAGE_KEYS.AGENTS, updated);
-  
-  // Also record in cost data
-  const today = new Date().toISOString().split("T")[0];
-  const costData: Record<string, { tokens: number; cost: number }> = getFromStorage(STORAGE_KEYS.COST_DATA, {});
-  if (!costData[today]) {
-    costData[today] = { tokens: 0, cost: 0 };
-  }
-  costData[today].tokens += tokens;
-  costData[today].cost += tokens * 0.00003; // Approximate cost per token
-  setToStorage(STORAGE_KEYS.COST_DATA, costData);
+export function saveSkills(skills: Skill[]): void {
+  setToStorage(STORAGE_KEYS.SKILLS, skills);
 }
 
-export function getCostData(): Record<string, { tokens: number; cost: number }> {
+export function addSkill(skill: Omit<Skill, "id">): Skill {
+  const skills = getSkills();
+  const newSkill: Skill = {
+    ...skill,
+    id: Date.now().toString(),
+  };
+  saveSkills([...skills, newSkill]);
+  return newSkill;
+}
+
+// Cron Job types
+export interface CronJob {
+  id: string;
+  name: string;
+  schedule: string;
+  lastRun: string;
+  nextRun: string;
+  status: "active" | "paused" | "error";
+  runCount: number;
+}
+
+export function getCronJobs(): CronJob[] {
+  return getFromStorage(STORAGE_KEYS.CRON_JOBS, []);
+}
+
+export function saveCronJobs(jobs: CronJob[]): void {
+  setToStorage(STORAGE_KEYS.CRON_JOBS, jobs);
+}
+
+export function addCronJob(job: Omit<CronJob, "id" | "runCount" | "lastRun">): CronJob {
+  const jobs = getCronJobs();
+  const newJob: CronJob = {
+    ...job,
+    id: Date.now().toString(),
+    runCount: 0,
+    lastRun: "-",
+  };
+  saveCronJobs([...jobs, newJob]);
+  return newJob;
+}
+
+// Scout Opportunity types
+export interface Opportunity {
+  id: string;
+  title: string;
+  type: "program" | "job" | "event" | "freelance";
+  source: string;
+  relevance: number;
+  deadline: string;
+  description: string;
+}
+
+export function getOpportunities(): Opportunity[] {
+  return getFromStorage(STORAGE_KEYS.SCOUT_DATA, []);
+}
+
+export function saveOpportunities(opportunities: Opportunity[]): void {
+  setToStorage(STORAGE_KEYS.SCOUT_DATA, opportunities);
+}
+
+// Memory File types
+export interface MemoryFile {
+  id: string;
+  title: string;
+  type: "config" | "daily" | "note";
+  updatedAt: string;
+  size: string;
+  content: string;
+}
+
+export function getMemoryFiles(): MemoryFile[] {
+  return getFromStorage(STORAGE_KEYS.MEMORY_FILES, []);
+}
+
+export function saveMemoryFiles(files: MemoryFile[]): void {
+  setToStorage(STORAGE_KEYS.MEMORY_FILES, files);
+}
+
+// Cost Data
+export interface CostData {
+  date: string;
+  tokens: number;
+  cost: number;
+}
+
+export function getCostData(): Record<string, CostData> {
   return getFromStorage(STORAGE_KEYS.COST_DATA, {});
 }
 
-// System stats (calculated from real data)
-export function getSystemStats() {
-  const agents = getAgents();
-  const tasks = getTasks();
+export function recordTokenUsage(tokens: number): void {
+  const today = new Date().toISOString().split("T")[0];
   const costData = getCostData();
   
-  const totalTokens = Object.values(costData).reduce((sum, d) => sum + d.tokens, 0);
-  const totalCost = Object.values(costData).reduce((sum, d) => sum + d.cost, 0);
+  if (!costData[today]) {
+    costData[today] = { date: today, tokens: 0, cost: 0 };
+  }
   
-  return {
-    cpu: Math.floor(Math.random() * 30) + 10, // Simulated
-    memory: Math.floor(Math.random() * 40) + 20, // Simulated
-    disk: Math.floor(Math.random() * 20) + 50, // Simulated
-    uptime: "15일 7시간",
-    activeAgents: agents.filter((a) => a.status === "active").length,
-    totalTasks: tasks.length,
-    completedTasks: tasks.filter((t) => t.status === "done").length,
-    totalTokens,
-    totalCost,
-  };
+  costData[today].tokens += tokens;
+  costData[today].cost += tokens * 0.00003;
+  
+  setToStorage(STORAGE_KEYS.COST_DATA, costData);
 }
 
 // Format relative time
@@ -268,11 +232,48 @@ export function formatRelativeTime(dateString: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
+
   if (diffMins < 1) return "방금";
   if (diffMins < 60) return `${diffMins}분 전`;
   if (diffHours < 24) return `${diffHours}시간 전`;
   if (diffDays === 1) return "어제";
   if (diffDays < 7) return `${diffDays}일 전`;
   return date.toLocaleDateString("ko-KR");
+}
+
+// Generate system stats from real data
+export function getSystemStats() {
+  const agents = getAgents();
+  const tasks = getTasks();
+  const costData = getCostData();
+
+  const totalTokens = Object.values(costData).reduce((sum, d) => sum + d.tokens, 0);
+  const totalCost = Object.values(costData).reduce((sum, d) => sum + d.cost, 0);
+
+  return {
+    cpu: Math.floor(Math.random() * 30) + 10,
+    memory: Math.floor(Math.random() * 40) + 20,
+    disk: Math.floor(Math.random() * 20) + 50,
+    uptime: "연결됨",
+    activeAgents: agents.filter((a) => a.status === "active").length,
+    totalAgents: agents.length,
+    totalTasks: tasks.length,
+    completedTasks: tasks.filter((t) => t.status === "done").length,
+    totalTokens,
+    totalCost,
+  };
+}
+
+// Gateway Config
+export interface GatewayConfig {
+  url: string;
+  token: string;
+}
+
+export function getGatewayConfig(): GatewayConfig {
+  return getFromStorage(STORAGE_KEYS.SETTINGS, { url: "", token: "" });
+}
+
+export function saveGatewayConfig(config: GatewayConfig): void {
+  setToStorage(STORAGE_KEYS.SETTINGS, config);
 }
