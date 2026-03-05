@@ -62,7 +62,7 @@ export default function CronPage() {
   const toggleStatus = (jobId: string) => {
     const updated = jobs.map((j) => {
       if (j.id === jobId) {
-        const newStatus = j.status === "active" ? "paused" : "active";
+        const newStatus: CronJob["status"] = j.status === "active" ? "paused" : "active";
         return { ...j, status: newStatus };
       }
       return j;
