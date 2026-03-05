@@ -55,7 +55,7 @@ export default function ScoutPage() {
         </button>
       </div>
 
-      <!-- Stats -->
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
           <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
@@ -87,7 +87,7 @@ export default function ScoutPage() {
         </div>
       </div>
 
-      <!-- Opportunities -->
+      {/* Opportunities */}
       <div className="space-y-4">
         {opportunities.map((opp) => (
           <div

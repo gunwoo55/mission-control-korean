@@ -59,7 +59,7 @@ export default function OfficePage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Workspaces -->
+        {/* Workspaces */}
         <div className="lg:col-span-2">
           <h2 className="text-lg font-semibold text-white mb-4">워크스페이스</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -96,7 +96,7 @@ export default function OfficePage() {
           </div>
         </div>
 
-        <!-- Recent Files -->
+        {/* Recent Files */}
         <div>
           <h2 className="text-lg font-semibold text-white mb-4">최근 파일</h2>
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">

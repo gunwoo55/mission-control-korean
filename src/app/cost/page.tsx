@@ -44,7 +44,7 @@ export default function CostTrackerPage() {
         <p className="text-gray-400">AI 사용량과 비용을 모니터링하세요</p>
       </div>
 
-      <!-- Summary Cards -->
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
@@ -84,7 +84,7 @@ export default function CostTrackerPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Daily Usage Chart -->
+        {/* Daily Usage Chart */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-lg font-semibold text-white mb-4">일별 사용량</h2>
           <div className="h-64">
@@ -113,7 +113,7 @@ export default function CostTrackerPage() {
           </div>
         </div>
 
-        <!-- Model Distribution -->
+        {/* Model Distribution */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <h2 className="text-lg font-semibold text-white mb-4">모델별 분포</h2>
           <div className="h-64">
@@ -158,7 +158,7 @@ export default function CostTrackerPage() {
         </div>
       </div>
 
-      <!-- Agent Breakdown -->
+      {/* Agent Breakdown */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4">에이전트별 사용량</h2>
         <div className="space-y-4">
