@@ -111,10 +111,48 @@ export interface Skill {
   category: string;
   version: string;
   installed: boolean;
+  isBuiltin?: boolean;
 }
 
 export function getSkills(): Skill[] {
-  return getFromStorage(STORAGE_KEYS.SKILLS, []);
+  const stored = getFromStorage<Skill[]>(STORAGE_KEYS.SKILLS, []);
+  
+  // If no skills stored, initialize with built-in skills
+  if (stored.length === 0) {
+    const builtinSkills: Skill[] = [
+      {
+        id: "builtin-prompt-optimizer",
+        name: "Claude Code 프롬프트 최적화",
+        description: "자연스러운 명령을 Claude Code 베스트 프랙티스에 맞게 최적화합니다. 작업 유형 분석 → 구체적 지시사항 변환 → 검증 단계 추가",
+        category: "개발",
+        version: "1.0.0",
+        installed: true,
+        isBuiltin: true,
+      },
+      {
+        id: "builtin-code-review",
+        name: "코드 리뷰어",
+        description: "작성된 코드를 검토하고 개선점을 제안합니다. TypeScript, 성능, 보안, 접근성 체크리스트 포함",
+        category: "개발",
+        version: "1.0.0",
+        installed: false,
+        isBuiltin: true,
+      },
+      {
+        id: "builtin-test-writer",
+        name: "테스트 작성기",
+        description: "코드를 분석하고 단위 테스트, 통합 테스트를 자동으로 생성합니다. Jest, Vitest 지원",
+        category: "개발",
+        version: "1.0.0",
+        installed: false,
+        isBuiltin: true,
+      },
+    ];
+    saveSkills(builtinSkills);
+    return builtinSkills;
+  }
+  
+  return stored;
 }
 
 export function saveSkills(skills: Skill[]): void {
