@@ -67,6 +67,18 @@ class OpenClawClient {
     if (this.baseUrl.startsWith("ws")) {
       this.baseUrl = this.baseUrl.replace(/^ws/, "http");
     }
+    // Save to localStorage for other tabs
+    localStorage.setItem("openclaw_config", JSON.stringify(config));
+  }
+
+  loadConfig(): GatewayConfig | null {
+    const saved = localStorage.getItem("openclaw_config");
+    if (saved) {
+      const config = JSON.parse(saved);
+      this.setConfig(config);
+      return config;
+    }
+    return null;
   }
 
   private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
