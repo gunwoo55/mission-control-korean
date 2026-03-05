@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Bot, Cpu, Zap, Terminal, Send, Loader2 } from "lucide-react";
+import { Activity, Bot, Zap, Send, Loader2 } from "lucide-react";
 import { useOpenClaw, SessionInfo } from "@/lib/openclaw-client";
 import { ConnectionPanel } from "@/components/connection-panel";
+
+interface LogEntry {
+  time: string;
+  text: string;
+  type: "info" | "error" | "sent";
+}
 
 export default function LiveDashboard() {
   const {
@@ -11,13 +17,12 @@ export default function LiveDashboard() {
     connecting,
     error,
     sessions,
-    currentStatus,
     connect,
     disconnect,
     sendMessage,
   } = useOpenClaw();
 
-  const [logs, setLogs] = useState<{ time: string; text: string; type: "info" | "error" | "sent" }>[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [command, setCommand] = useState("");
   const [sending, setSending] = useState(false);
@@ -28,13 +33,13 @@ export default function LiveDashboard() {
 
   useEffect(() => {
     if (connected) {
-      addLog("✅ OpenClaw 게이트웨이에 연결됨", "info");
+      addLog("Connected to OpenClaw gateway", "info");
     }
   }, [connected]);
 
   useEffect(() => {
     if (error) {
-      addLog(`❌ ${error}`, "error");
+      addLog(`Error: ${error}`, "error");
     }
   }, [error]);
 
@@ -42,20 +47,19 @@ export default function LiveDashboard() {
     if (!selectedSession || !command.trim() || sending) return;
     
     setSending(true);
-    addLog(`📤 [${selectedSession.agentId || selectedSession.sessionKey.slice(0, 8)}] ${command}`, "sent");
+    addLog(`[${selectedSession.agentId || selectedSession.sessionKey.slice(0, 8)}] ${command}`, "sent");
     
     try {
       await sendMessage(selectedSession.sessionKey, command);
-      addLog("✅ 메시지 전송 완료", "info");
+      addLog("Message sent successfully", "info");
     } catch (err: any) {
-      addLog(`❌ 전송 실패: ${err.message}`, "error");
+      addLog(`Failed: ${err.message}`, "error");
     } finally {
       setSending(false);
       setCommand("");
     }
   };
 
-  // Calculate stats from real data
   const activeSessions = sessions.filter((s) => s.active).length;
   const totalTokens = sessions.reduce((sum, s) => sum + (s.tokenUsage?.total || 0), 0);
   const totalCost = sessions.reduce((sum, s) => sum + (s.costUSD || 0), 0);
@@ -89,36 +93,19 @@ export default function LiveDashboard() {
         <ConnectionPanel onConnect={connect} connecting={connecting} />
       ) : (
         <>
-          {/* Stats - Real Data */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              icon={Bot}
-              label="총 세션"
-              value={sessions.length}
-              color="blue"
-            />
-            <StatCard
-              icon={Zap}
-              label="활성 세션"
-              value={activeSessions}
-              color="green"
-            />
+            <StatCard icon={Bot} label="총 세션" value={sessions.length} color="blue" />
+            <StatCard icon={Zap} label="활성 세션" value={activeSessions} color="green" />
             <StatCard
               icon={Activity}
               label="총 토큰"
               value={totalTokens > 1000 ? `${(totalTokens / 1000).toFixed(1)}K` : totalTokens}
               color="amber"
             />
-            <StatCard
-              icon={Cpu}
-              label="예상 비용"
-              value={`$${totalCost.toFixed(4)}`}
-              color="purple"
-            />
+            <StatCard icon={Activity} label="예상 비용" value={`$${totalCost.toFixed(4)}`} color="purple" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Sessions - Real Data */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">세션 목록</h2>
@@ -141,9 +128,7 @@ export default function LiveDashboard() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${
-                            session.active ? "bg-green-500" : "bg-gray-500"
-                          }`}></div>
+                          <div className={`w-2 h-2 rounded-full ${session.active ? "bg-green-500" : "bg-gray-500"}`}></div>
                           <div>
                             <div className="text-sm font-medium text-white">
                               {session.agentId || session.label || "Unknown"}
@@ -155,7 +140,7 @@ export default function LiveDashboard() {
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-gray-400">
-                            {session.tokenUsage?.total?.toLocaleString() || 0} 토큰
+                            {(session.tokenUsage?.total || 0).toLocaleString()} 토큰
                           </div>
                           <div className="text-xs text-gray-600">
                             {new Date(session.lastActivityAt).toLocaleTimeString()}
@@ -168,7 +153,6 @@ export default function LiveDashboard() {
               </div>
             </div>
 
-            {/* Terminal / Logs */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">터미널</h2>
@@ -187,11 +171,7 @@ export default function LiveDashboard() {
                     <div
                       key={i}
                       className={`mb-1 ${
-                        log.type === "error"
-                          ? "text-red-400"
-                          : log.type === "sent"
-                          ? "text-indigo-400"
-                          : "text-gray-300"
+                        log.type === "error" ? "text-red-400" : log.type === "sent" ? "text-indigo-400" : "text-gray-300"
                       }`}
                     >
                       <span className="text-gray-600">[{log.time}]</span> {log.text}
@@ -207,7 +187,7 @@ export default function LiveDashboard() {
                     value={command}
                     onChange={(e) => setCommand(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && handleSendCommand()}
-                    placeholder={`${selectedSession.agentId || "세션"}에게 메시지 별내기...`}
+                    placeholder={`${selectedSession.agentId || "세션"}에게 메시지...`}
                     disabled={sending}
                     className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm disabled:opacity-50"
                   />
@@ -216,18 +196,12 @@ export default function LiveDashboard() {
                     disabled={!command.trim() || sending}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded text-sm flex items-center gap-2"
                   >
-                    {sending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
+                    {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     전송
                   </button>
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-gray-500 text-center">
-                  왼쪽에서 세션을 선택하세요
-                </p>
+                <p className="mt-4 text-sm text-gray-500 text-center">왼쪽에서 세션을 선택하세요</p>
               )}
             </div>
           </div>
