@@ -19,7 +19,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Appearance -->
+        {/* Appearance */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
@@ -68,7 +68,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <!-- Notifications -->
+        {/* Notifications */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
@@ -117,7 +117,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <!-- Data Management -->
+        {/* Data Management */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
@@ -147,7 +147,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <!-- API Settings -->
+        {/* API Settings */}
         <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
@@ -187,7 +187,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <!-- Security -->
+        {/* Security */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">

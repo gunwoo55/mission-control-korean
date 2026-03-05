@@ -46,7 +46,7 @@ export default function ConversationsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Conversation List -->
+        {/* Conversation List */}
         <div className="lg:col-span-1 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
           <div className="p-4 border-b border-gray-800">
             <input
@@ -88,7 +88,7 @@ export default function ConversationsPage() {
           </div>
         </div>
 
-        <!-- Chat Area -->
+        {/* Chat Area */}
         <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-xl flex flex-col h-[600px]">
           <div className="p-4 border-b border-gray-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
