@@ -37,7 +37,7 @@ export default function OfficePage() {
   ]);
   const [particles, setParticles] = useState<TaskParticle[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | null>(null);
 
   // Game loop
   useEffect(() => {
