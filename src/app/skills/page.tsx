@@ -1,54 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wrench, Check, Download, ExternalLink, Plus, X } from "lucide-react";
-import { getFromStorage, setToStorage } from "@/lib/data";
+import { Wrench, Check, Download, Plus, X } from "lucide-react";
+import { getSkills, saveSkills, addSkill, Skill } from "@/lib/data";
 
-interface Skill {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  version: string;
-  installed: boolean;
-}
-
-const defaultSkills: Skill[] = [
-  {
-    id: "1",
-    name: "web-search",
-    description: "웹 검색 및 정보 수집",
-    category: "리서치",
-    version: "1.2.0",
-    installed: true,
-  },
-  {
-    id: "2",
-    name: "coding-agent",
-    description: "코드 생성 및 리뷰",
-    category: "개발",
-    version: "2.1.0",
-    installed: true,
-  },
-  {
-    id: "3",
-    name: "weather",
-    description: "날씨 정보 조회",
-    category: "유틸리티",
-    version: "1.0.0",
-    installed: true,
-  },
-  {
-    id: "4",
-    name: "discord",
-    description: "Discord 메시지 전송",
-    category: "메시징",
-    version: "1.3.0",
-    installed: false,
-  },
-];
-
-const STORAGE_KEY = "mc_skills";
+const CATEGORIES = ["리서치", "개발", "메시징", "유틸리티", "데이터", "자동화"];
 
 export default function SkillsPage() {
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -61,8 +17,7 @@ export default function SkillsPage() {
   });
 
   useEffect(() => {
-    const stored = getFromStorage(STORAGE_KEY, defaultSkills);
-    setSkills(stored);
+    setSkills(getSkills());
   }, []);
 
   const toggleSkill = (skillId: string) => {
@@ -70,19 +25,13 @@ export default function SkillsPage() {
       s.id === skillId ? { ...s, installed: !s.installed } : s
     );
     setSkills(updated);
-    setToStorage(STORAGE_KEY, updated);
+    saveSkills(updated);
   };
 
   const handleAddSkill = () => {
     if (!newSkill.name.trim()) return;
-    const skill: Skill = {
-      ...newSkill,
-      id: Date.now().toString(),
-      installed: false,
-    };
-    const updated = [...skills, skill];
-    setSkills(updated);
-    setToStorage(STORAGE_KEY, updated);
+    addSkill({ ...newSkill, installed: false });
+    setSkills(getSkills());
     setIsAddModalOpen(false);
     setNewSkill({ name: "", description: "", category: "개발", version: "1.0.0" });
   };
@@ -90,15 +39,6 @@ export default function SkillsPage() {
   const getCategoryCount = (category: string) => {
     return skills.filter((s) => s.category === category && s.installed).length;
   };
-
-  const categories = [
-    { name: "리서치", icon: "🔍" },
-    { name: "개발", icon: "💻" },
-    { name: "메시징", icon: "💬" },
-    { name: "유틸리티", icon: "🛠️" },
-    { name: "데이터", icon: "📊" },
-    { name: "자동화", icon: "⚡" },
-  ];
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -116,82 +56,96 @@ export default function SkillsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {skills.map((skill) => (
-          <div
-            key={skill.id}
-            className={`bg-gray-900 border rounded-xl p-4 lg:p-5 transition-colors ${
-              skill.installed
-                ? "border-gray-800"
-                : "border-gray-800/50 opacity-75"
-            }`}
+      {skills.length === 0 ? (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+          <div className="text-4xl mb-4">🛠️</div>
+          <h3 className="text-lg font-semibold text-white mb-2">등록된 스킬이 없습니다</h3>
+          <p className="text-gray-400 mb-4">새로운 스킬을 추가하세요.</p>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
           >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+            첫 스킬 추가
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {skills.map((skill) => (
+              <div
+                key={skill.id}
+                className={`bg-gray-900 border rounded-xl p-4 lg:p-5 transition-colors ${
+                  skill.installed ? "border-gray-800" : "border-gray-800/50 opacity-75"
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      skill.installed ? "bg-indigo-500/20 text-indigo-400" : "bg-gray-800 text-gray-500"
+                    }`}>
+                      <Wrench className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white text-sm lg:text-base">{skill.name}</h3>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-500">{skill.category}</span>
+                        <span className="text-gray-600">•</span>
+                        <span className="text-gray-500">v{skill.version}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {skill.installed && (
+                    <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-green-400" />
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-sm text-gray-400 mb-4">{skill.description || "설명 없음"}</p>
+
+                <button
+                  onClick={() => toggleSkill(skill.id)}
+                  className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     skill.installed
-                      ? "bg-indigo-500/20 text-indigo-400"
-                      : "bg-gray-800 text-gray-500"
+                      ? "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
                   }`}
                 >
-                  <Wrench className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white text-sm lg:text-base">{skill.name}</h3>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-500">{skill.category}</span>
-                    <span className="text-gray-600">•</span>
-                    <span className="text-gray-500">v{skill.version}</span>
-                  </div>
-                </div>
+                  {skill.installed ? (
+                    "설치됨"
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      설치
+                    </>
+                  )}
+                </button>
               </div>
-              {skill.installed && (
-                <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
-                  <Check className="w-4 h-4 text-green-400" />
-                </div>
-              )}
-            </div>
-
-            <p className="text-sm text-gray-400 mb-4">{skill.description}</p>
-
-            <button
-              onClick={() => toggleSkill(skill.id)}
-              className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                skill.installed
-                  ? "bg-gray-800 hover:bg-gray-700 text-gray-300"
-                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
-              }`}
-            >
-              {skill.installed ? (
-                <>설치됨</>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  설치
-                </>
-              )}
-            </button>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Categories */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 lg:p-6">
-        <h2 className="text-base lg:text-lg font-semibold text-white mb-4">스킬 카테고리</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
-          {categories.map((category) => (
-            <button
-              key={category.name}
-              className="p-3 lg:p-4 bg-gray-800 hover:bg-gray-700 rounded-lg text-center transition-colors"
-            >
-              <div className="text-xl lg:text-2xl mb-1 lg:mb-2">{category.icon}</div>
-              <div className="text-sm font-medium text-white">{category.name}</div>
-              <div className="text-xs text-gray-500 mt-1">{getCategoryCount(category.name)}개 설치됨</div>
-            </button>
-          ))}
-        </div>
-      </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 lg:p-6">
+            <h2 className="text-base lg:text-lg font-semibold text-white mb-4">스킬 카테고리</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4">
+              {CATEGORIES.map((category) => (
+                <div key={category} className="p-3 lg:p-4 bg-gray-800 rounded-lg text-center"
+                >
+                  <div className="text-xl lg:text-2xl mb-1 lg:mb-2">
+                    {category === "리서치" && "🔍"}
+                    {category === "개발" && "💻"}
+                    {category === "메시징" && "💬"}
+                    {category === "유틸리티" && "🛠️"}
+                    {category === "데이터" && "📊"}
+                    {category === "자동화" && "⚡"}
+                  </div>
+                  <div className="text-sm font-medium text-white">{category}</div>
+                  <div className="text-xs text-gray-500 mt-1">{getCategoryCount(category)}개 설치됨</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Add Skill Modal */}
       {isAddModalOpen && (
@@ -235,8 +189,8 @@ export default function SkillsPage() {
                     onChange={(e) => setNewSkill({ ...newSkill, category: e.target.value })}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
                   >
-                    {categories.map((c) => (
-                      <option key={c.name} value={c.name}>{c.name}</option>
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
