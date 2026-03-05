@@ -225,7 +225,7 @@ export function recordTokenUsage(agentId: string, tokens: number): void {
   
   // Also record in cost data
   const today = new Date().toISOString().split("T")[0];
-  const costData = getFromStorage(STORAGE_KEYS.COST_DATA, {});
+  const costData: Record<string, { tokens: number; cost: number }> = getFromStorage(STORAGE_KEYS.COST_DATA, {});
   if (!costData[today]) {
     costData[today] = { tokens: 0, cost: 0 };
   }

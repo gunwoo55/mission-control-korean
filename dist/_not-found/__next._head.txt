@@ -1,0 +1,6 @@
+1:"$Sreact.fragment"
+2:I[97367,["/mission-control-korean/_next/static/chunks/ff1a16fafef87110.js","/mission-control-korean/_next/static/chunks/a2dfb6fc5208ab9b.js"],"ViewportBoundary"]
+3:I[97367,["/mission-control-korean/_next/static/chunks/ff1a16fafef87110.js","/mission-control-korean/_next/static/chunks/a2dfb6fc5208ab9b.js"],"MetadataBoundary"]
+4:"$Sreact.suspense"
+5:I[27201,["/mission-control-korean/_next/static/chunks/ff1a16fafef87110.js","/mission-control-korean/_next/static/chunks/a2dfb6fc5208ab9b.js"],"IconMark"]
+0:{"buildId":"gVMw4C_bOnSKlDsPMnR8d","rsc":["$","$1","h",{"children":[["$","meta",null,{"name":"robots","content":"noindex"}],["$","$L2",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","div",null,{"hidden":true,"children":["$","$L3",null,{"children":["$","$4",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"미션 컨트롤 | OpenClaw 대시보드"}],["$","meta","1",{"name":"description","content":"OpenClaw AI 에이전트 통합 관리 시스템"}],["$","link","2",{"rel":"icon","href":"/mission-control-korean/favicon.ico?favicon.0b3bf435.ico","sizes":"256x256","type":"image/x-icon"}],["$","$L5","3",{}]]}]}]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"loading":null,"isPartial":false}
