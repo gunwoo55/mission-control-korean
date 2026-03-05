@@ -1,344 +1,252 @@
-// Real-time OpenClaw Gateway Client
-// This connects to actual OpenClaw gateway for live data
+// OpenClaw Gateway HTTP Client
+// Connects to OpenClaw gateway via HTTP API
 
-export interface GatewayConnection {
+const API_BASE = "/api"; // Proxy through Next.js
+
+export interface GatewayConfig {
   url: string;
   token: string;
-  connected: boolean;
 }
 
-export interface LiveSession {
+export interface SessionInfo {
   sessionKey: string;
-  agentId: string;
-  status: "active" | "idle" | "offline";
-  tokenUsage: {
+  agentId?: string;
+  label?: string;
+  model: string;
+  createdAt: string;
+  lastActivityAt: string;
+  active: boolean;
+  tokenUsage?: {
     total: number;
     prompt: number;
     completion: number;
   };
-  lastActivity: string;
-  currentTask?: string;
+  costUSD?: number;
 }
 
-export interface LiveStats {
-  totalSessions: number;
-  activeSessions: number;
-  totalTokens: number;
-  uptime: string;
-  version: string;
+export interface SessionStatus {
+  sessionKey: string;
+  model: string;
+  agentId?: string;
+  runtime: {
+    host: string;
+    shell: string;
+    channel?: string;
+  };
+  usage: {
+    tokens: {
+      total: number;
+      prompt: number;
+      completion: number;
+    };
+    costUSD: number;
+  };
+  time: {
+    elapsedMs: number;
+    thinkingMs?: number;
+  };
+}
+
+export interface CronJob {
+  id: string;
+  name: string;
+  schedule: string;
+  enabled: boolean;
+  lastRun?: string;
+  nextRun?: string;
 }
 
 class OpenClawClient {
-  private ws: WebSocket | null = null;
-  private url: string = "";
-  private token: string = "";
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
-  private listeners: Map<string, Function[]> = new Map();
-  private messageId: number = 0;
-  private pendingRequests: Map<number, { resolve: Function; reject: Function }> = new Map();
+  private config: GatewayConfig | null = null;
+  private baseUrl: string = "";
 
-  // Connect to gateway
-  connect(url: string, token: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.url = url;
-      this.token = token;
-
-      try {
-        // Convert http/https to ws/wss
-        const wsUrl = url.replace(/^http/, "ws");
-        this.ws = new WebSocket(wsUrl);
-
-        this.ws.onopen = () => {
-          console.log("[OpenClaw] Connected to gateway");
-          this.reconnectAttempts = 0;
-          this.authenticate();
-          resolve();
-        };
-
-        this.ws.onmessage = (event) => {
-          this.handleMessage(JSON.parse(event.data));
-        };
-
-        this.ws.onerror = (error) => {
-          console.error("[OpenClaw] WebSocket error:", error);
-          reject(error);
-        };
-
-        this.ws.onclose = () => {
-          console.log("[OpenClaw] Disconnected");
-          this.emit("disconnected");
-          this.attemptReconnect();
-        };
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  // Authenticate with token
-  private authenticate() {
-    this.sendRequest("auth", { token: this.token })
-      .then(() => {
-        console.log("[OpenClaw] Authenticated");
-        this.emit("connected");
-        this.startPolling();
-      })
-      .catch((err) => {
-        console.error("[OpenClaw] Auth failed:", err);
-        this.emit("auth_failed", err);
-      });
-  }
-
-  // Send JSON-RPC request
-  private sendRequest(method: string, params?: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-        reject(new Error("Not connected"));
-        return;
-      }
-
-      const id = ++this.messageId;
-      const message = {
-        jsonrpc: "2.0",
-        method,
-        params,
-        id,
-      };
-
-      this.pendingRequests.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify(message));
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        if (this.pendingRequests.has(id)) {
-          this.pendingRequests.delete(id);
-          reject(new Error("Request timeout"));
-        }
-      }, 10000);
-    });
-  }
-
-  // Handle incoming messages
-  private handleMessage(data: any) {
-    // Handle response
-    if (data.id !== undefined && this.pendingRequests.has(data.id)) {
-      const { resolve, reject } = this.pendingRequests.get(data.id)!;
-      this.pendingRequests.delete(data.id);
-
-      if (data.error) {
-        reject(data.error);
-      } else {
-        resolve(data.result);
-      }
-      return;
-    }
-
-    // Handle notifications/pushes
-    if (data.method) {
-      this.emit(data.method, data.params);
+  setConfig(config: GatewayConfig) {
+    this.config = config;
+    // Remove trailing slash and ensure https
+    this.baseUrl = config.url.replace(/\/$/, "");
+    if (this.baseUrl.startsWith("ws")) {
+      this.baseUrl = this.baseUrl.replace(/^ws/, "http");
     }
   }
 
-  // Reconnect logic
-  private attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("[OpenClaw] Max reconnect attempts reached");
-      this.emit("reconnect_failed");
-      return;
-    }
+  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
+    if (!this.config) throw new Error("Not configured");
 
-    this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-
-    console.log(`[OpenClaw] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-
-    setTimeout(() => {
-      this.connect(this.url, this.token).catch(() => {
-        // Reconnect failed, will try again
-      });
-    }, delay);
-  }
-
-  // Start polling for live data
-  private startPolling() {
-    // Poll sessions every 5 seconds
-    const pollSessions = () => {
-      this.getSessions().then((sessions) => {
-        this.emit("sessions_updated", sessions);
-      });
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "X-Gateway-Token": this.config.token,
+      ...((options.headers as Record<string, string>) || {}),
     };
 
-    pollSessions();
-    setInterval(pollSessions, 5000);
-
-    // Poll stats every 10 seconds
-    const pollStats = () => {
-      this.getStats().then((stats) => {
-        this.emit("stats_updated", stats);
-      });
-    };
-
-    pollStats();
-    setInterval(pollStats, 10000);
-  }
-
-  // Event emitter
-  on(event: string, callback: Function) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, []);
-    }
-    this.listeners.get(event)!.push(callback);
-  }
-
-  off(event: string, callback: Function) {
-    const callbacks = this.listeners.get(event);
-    if (callbacks) {
-      const index = callbacks.indexOf(callback);
-      if (index > -1) callbacks.splice(index, 1);
-    }
-  }
-
-  private emit(event: string, data?: any) {
-    const callbacks = this.listeners.get(event);
-    if (callbacks) {
-      callbacks.forEach((cb) => cb(data));
-    }
-  }
-
-  // Public API methods
-  async getSessions(): Promise<LiveSession[]> {
-    const result = await this.sendRequest("sessions_list", { activeMinutes: 60 });
-    return result.sessions?.map((s: any) => ({
-      sessionKey: s.sessionKey,
-      agentId: s.agentId || "unknown",
-      status: s.active ? "active" : "idle",
-      tokenUsage: s.tokenUsage || { total: 0, prompt: 0, completion: 0 },
-      lastActivity: s.lastActivityAt,
-    })) || [];
-  }
-
-  async getStats(): Promise<LiveStats> {
-    const result = await this.sendRequest("gateway_status");
-    return {
-      totalSessions: result.sessions?.length || 0,
-      activeSessions: result.sessions?.filter((s: any) => s.active).length || 0,
-      totalTokens: result.sessions?.reduce((sum: number, s: any) => sum + (s.tokenUsage?.total || 0), 0) || 0,
-      uptime: result.uptime || "unknown",
-      version: result.version || "unknown",
-    };
-  }
-
-  async executeCommand(sessionKey: string, command: string): Promise<any> {
-    return this.sendRequest("sessions_send", {
-      sessionKey,
-      message: command,
-    });
-  }
-
-  async spawnSubAgent(task: string, options?: any): Promise<any> {
-    return this.sendRequest("sessions_spawn", {
-      task,
+    const response = await fetch(url, {
       ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Test connection
+  async testConnection(): Promise<{ version: string; status: string }> {
+    return this.request("/status");
+  }
+
+  // Get all sessions
+  async getSessions(options?: { 
+    activeMinutes?: number; 
+    kinds?: string[];
+    limit?: number;
+  }): Promise<SessionInfo[]> {
+    const params = new URLSearchParams();
+    if (options?.activeMinutes) params.set("activeMinutes", String(options.activeMinutes));
+    if (options?.limit) params.set("limit", String(options.limit));
+    
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const result = await this.request(`/sessions${query}`);
+    return result.sessions || [];
+  }
+
+  // Get specific session status (includes token usage)
+  async getSessionStatus(sessionKey?: string): Promise<SessionStatus> {
+    const key = sessionKey || "current";
+    return this.request(`/sessions/${key}/status`);
+  }
+
+  // Send message to session
+  async sendMessage(sessionKey: string, message: string): Promise<void> {
+    await this.request(`/sessions/${sessionKey}/send`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
     });
   }
 
-  async getCronJobs(): Promise<any[]> {
-    return this.sendRequest("cron_list");
+  // Spawn sub-agent
+  async spawnAgent(task: string, agentId?: string): Promise<{ sessionKey: string }> {
+    return this.request("/spawn", {
+      method: "POST",
+      body: JSON.stringify({
+        task,
+        agentId,
+        cleanup: "keep",
+      }),
+    });
   }
 
-  async runCronJob(jobId: string): Promise<any> {
-    return this.sendRequest("cron_run", { jobId });
+  // Get cron jobs
+  async getCronJobs(): Promise<CronJob[]> {
+    const result = await this.request("/cron");
+    return result.jobs || [];
   }
 
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+  // Run cron job immediately
+  async runCronJob(jobId: string): Promise<void> {
+    await this.request(`/cron/${jobId}/run`, {
+      method: "POST",
+    });
   }
 
-  isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+  // Get sub-agents for a session
+  async getSubAgents(sessionKey: string): Promise<SessionInfo[]> {
+    const result = await this.request(`/sessions/${sessionKey}/subagents`);
+    return result.subagents || [];
+  }
+
+  isConfigured(): boolean {
+    return !!this.config;
   }
 }
 
-// Singleton instance
 export const openClawClient = new OpenClawClient();
 
-// React hook for using OpenClaw
-export function useOpenClawConnection() {
+// React hook
+import { useState, useEffect, useCallback } from "react";
+
+export function useOpenClaw() {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<LiveSession[]>([]);
-  const [stats, setStats] = useState<LiveStats | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [currentStatus, setCurrentStatus] = useState<SessionStatus | null>(null);
 
-  useEffect(() => {
-    const handleConnected = () => {
-      setConnected(true);
-      setConnecting(false);
-      setError(null);
-    };
-
-    const handleDisconnected = () => {
-      setConnected(false);
-    };
-
-    const handleAuthFailed = (err: any) => {
-      setError("Authentication failed: " + err.message);
-      setConnecting(false);
-    };
-
-    const handleSessions = (data: LiveSession[]) => {
-      setSessions(data);
-    };
-
-    const handleStats = (data: LiveStats) => {
-      setStats(data);
-    };
-
-    openClawClient.on("connected", handleConnected);
-    openClawClient.on("disconnected", handleDisconnected);
-    openClawClient.on("auth_failed", handleAuthFailed);
-    openClawClient.on("sessions_updated", handleSessions);
-    openClawClient.on("stats_updated", handleStats);
-
-    return () => {
-      openClawClient.off("connected", handleConnected);
-      openClawClient.off("disconnected", handleDisconnected);
-      openClawClient.off("auth_failed", handleAuthFailed);
-      openClawClient.off("sessions_updated", handleSessions);
-      openClawClient.off("stats_updated", handleStats);
-    };
-  }, []);
-
-  const connect = async (url: string, token: string) => {
+  const connect = useCallback(async (url: string, token: string) => {
     setConnecting(true);
     setError(null);
+    
     try {
-      await openClawClient.connect(url, token);
+      openClawClient.setConfig({ url, token });
+      const status = await openClawClient.testConnection();
+      console.log("[OpenClaw] Connected:", status);
+      setConnected(true);
+      
+      // Load initial data
+      const sessionsData = await openClawClient.getSessions({ limit: 50 });
+      setSessions(sessionsData);
+      
+      try {
+        const current = await openClawClient.getSessionStatus();
+        setCurrentStatus(current);
+      } catch (e) {
+        // current session might not exist
+      }
     } catch (err: any) {
-      setError(err.message);
+      console.error("[OpenClaw] Connection failed:", err);
+      setError(err.message || "Connection failed");
+      setConnected(false);
+    } finally {
       setConnecting(false);
     }
-  };
+  }, []);
 
-  const disconnect = () => {
-    openClawClient.disconnect();
+  const disconnect = useCallback(() => {
     setConnected(false);
-  };
+    setSessions([]);
+    setCurrentStatus(null);
+  }, []);
+
+  const refreshSessions = useCallback(async () => {
+    if (!connected) return;
+    try {
+      const data = await openClawClient.getSessions({ limit: 50 });
+      setSessions(data);
+    } catch (e) {
+      console.error("Failed to refresh sessions:", e);
+    }
+  }, [connected]);
+
+  const sendMessage = useCallback(async (sessionKey: string, message: string) => {
+    if (!connected) throw new Error("Not connected");
+    await openClawClient.sendMessage(sessionKey, message);
+  }, [connected]);
+
+  const spawnAgent = useCallback(async (task: string, agentId?: string) => {
+    if (!connected) throw new Error("Not connected");
+    return openClawClient.spawnAgent(task, agentId);
+  }, [connected]);
+
+  // Auto-refresh sessions every 5 seconds when connected
+  useEffect(() => {
+    if (!connected) return;
+    
+    const interval = setInterval(refreshSessions, 5000);
+    return () => clearInterval(interval);
+  }, [connected, refreshSessions]);
 
   return {
     connected,
     connecting,
     error,
     sessions,
-    stats,
+    currentStatus,
     connect,
     disconnect,
-    client: openClawClient,
+    refreshSessions,
+    sendMessage,
+    spawnAgent,
   };
 }
-
-import { useState, useEffect } from "react";
